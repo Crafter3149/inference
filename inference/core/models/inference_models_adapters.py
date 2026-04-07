@@ -13,6 +13,7 @@ from inference.core.entities.requests import (
     InferenceRequest,
 )
 from inference.core.entities.responses.inference import (
+    AnomalyDetectionInferenceResponse,
     ClassificationInferenceResponse,
     InferenceResponse,
     InferenceResponseImage,
@@ -1026,3 +1027,75 @@ class InferenceModelsSemanticSegmentationAdapter(Model):
             "draw_predictions(...) is not implemented for semantic segmentation models - responses contain "
             "visualization already."
         )
+
+
+class InferenceModelsAnomalyDetectionAdapter(Model):
+    def __init__(self, model_id: str, api_key: str = None, **kwargs):
+        super().__init__()
+        self.metrics = {"num_inferences": 0, "avg_inference_time": 0.0}
+        self.api_key = api_key if api_key else API_KEY
+        self.task_type = "anomaly-detection"
+        from inference_models.models.base.anomaly_detection import AnomalyDetectionModel
+
+        self._model: AnomalyDetectionModel = AutoModel.from_pretrained(
+            model_id_or_path=model_id,
+            api_key=self.api_key,
+            allow_untrusted_packages=ALLOW_INFERENCE_MODELS_UNTRUSTED_PACKAGES,
+            allow_direct_local_storage_loading=ALLOW_INFERENCE_MODELS_DIRECTLY_ACCESS_LOCAL_PACKAGES,
+            **kwargs,
+        )
+        self.class_names = list(self._model.class_names)
+
+    def preprocess(self, image: Any, **kwargs):
+        is_batch = isinstance(image, list)
+        images = image if is_batch else [image]
+        np_images: List[np.ndarray] = [
+            load_image_bgr(
+                v,
+                disable_preproc_auto_orient=kwargs.get(
+                    "disable_preproc_auto_orient", False
+                ),
+            )
+            for v in images
+        ]
+        return self._model.pre_process(np_images, **kwargs), [(img.shape[0], img.shape[1]) for img in np_images]
+
+    def predict(self, img_in, **kwargs):
+        return self._model.forward(img_in, **kwargs)
+
+    def postprocess(
+        self,
+        predictions,
+        preprocess_return_metadata,
+        **kwargs,
+    ) -> List[AnomalyDetectionInferenceResponse]:
+        results = self._model.post_process(predictions, **kwargs)
+        image_sizes = preprocess_return_metadata
+        responses = []
+        for r, image_size in zip(results, image_sizes):
+            responses.append(
+                AnomalyDetectionInferenceResponse(
+                    anomaly_score=float(r.anomaly_score.item()),
+                    anomaly_map=r.anomaly_map.cpu().numpy().tolist(),
+                    image=InferenceResponseImage(
+                        width=image_size[1], height=image_size[0]
+                    ),
+                )
+            )
+        return responses
+
+    def infer_from_request(
+        self,
+        request: InferenceRequest,
+    ) -> Union[List[InferenceResponse], InferenceResponse]:
+        t1 = perf_counter()
+        responses = self.infer(**request.dict(), return_image_dims=True)
+        for response in responses:
+            response.time = perf_counter() - t1
+            response.inference_id = getattr(request, "id", None)
+        if not isinstance(request.image, list):
+            responses = responses[0]
+        return responses
+
+    def clear_cache(self, delete_from_disk: bool = True) -> None:
+        pass

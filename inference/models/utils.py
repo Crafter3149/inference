@@ -717,6 +717,7 @@ def get_roboflow_model(*args, **kwargs):
 if USE_INFERENCE_MODELS:
     # Ensure experimental package is importable before swapping
     from inference.core.models.inference_models_adapters import (
+        InferenceModelsAnomalyDetectionAdapter,
         InferenceModelsClassificationAdapter,
         InferenceModelsInstanceSegmentationAdapter,
         InferenceModelsKeyPointsDetectionAdapter,
@@ -1016,3 +1017,9 @@ if USE_INFERENCE_MODELS:
         )
 
         ROBOFLOW_MODEL_TYPES[("vlm", "glm-ocr")] = InferenceModelsGLMOCRAdapter
+
+    # AIE models (local path models, no Roboflow API needed)
+    ROBOFLOW_MODEL_TYPES[("object-detection", "aie")] = InferenceModelsObjectDetectionAdapter
+    ROBOFLOW_MODEL_TYPES[("classification", "aie")] = InferenceModelsClassificationAdapter
+    ROBOFLOW_MODEL_TYPES[("instance-segmentation", "aie")] = InferenceModelsInstanceSegmentationAdapter
+    ROBOFLOW_MODEL_TYPES[("anomaly-detection", "aie")] = InferenceModelsAnomalyDetectionAdapter

@@ -18,9 +18,7 @@ from inference.core.managers.active_learning import (
 )
 from inference.core.managers.base import ModelManager
 from inference.core.managers.decorators.fixed_size_cache import WithFixedSizeCache
-from inference.core.registries.roboflow import (
-    RoboflowModelRegistry,
-)
+from inference.core.registries.aie import AIEModelRegistry
 from inference.models.utils import ROBOFLOW_MODEL_TYPES
 
 if ENABLE_STREAM_API:
@@ -29,7 +27,7 @@ if ENABLE_STREAM_API:
     )
     stream_manager_process.start()
 
-model_registry = RoboflowModelRegistry(ROBOFLOW_MODEL_TYPES)
+model_registry = AIEModelRegistry(ROBOFLOW_MODEL_TYPES)
 
 if ACTIVE_LEARNING_ENABLED:
     if LAMBDA or GCP_SERVERLESS:
