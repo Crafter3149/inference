@@ -304,6 +304,9 @@ from inference.core.workflows.core_steps.models.foundation.stability_ai.outpaint
 from inference.core.workflows.core_steps.models.foundation.yolo_world.v1 import (
     YoloWorldModelBlockV1,
 )
+from inference.core.workflows.core_steps.models.aie.anomaly_detection.v1 import (
+    AIEAnomalyDetectionBlockV1,
+)
 from inference.core.workflows.core_steps.models.roboflow.instance_segmentation.v1 import (
     RoboflowInstanceSegmentationModelBlockV1,
 )
@@ -700,6 +703,7 @@ def _should_filter_block(block_class: Type[WorkflowBlock]) -> bool:
 def load_blocks() -> List[Type[WorkflowBlock]]:
     blocks = [
         AbsoluteStaticCropBlockV1,
+        AIEAnomalyDetectionBlockV1,
         DynamicCropBlockV1,
         DetectionsFilterBlockV1,
         DetectionOffsetBlockV1,
