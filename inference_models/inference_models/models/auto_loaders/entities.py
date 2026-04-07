@@ -15,6 +15,7 @@ from inference_models.models.base.object_detection import (
     ObjectDetectionModel,
     OpenVocabularyObjectDetectionModel,
 )
+from inference_models.models.base.anomaly_detection import AnomalyDetectionModel
 from inference_models.models.base.semantic_segmentation import SemanticSegmentationModel
 
 ModelArchitecture = str
@@ -34,6 +35,7 @@ class BackendType(str, Enum):
 
 
 AnyModel = Union[
+    AnomalyDetectionModel,
     ClassificationModel,
     MultiLabelClassificationModel,
     DepthEstimationModel,

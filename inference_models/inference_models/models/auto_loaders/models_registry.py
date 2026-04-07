@@ -22,6 +22,7 @@ STRUCTURED_OCR_TASK = "structured-ocr"
 TEXT_ONLY_OCR_TASK = "text-only-ocr"
 GAZE_DETECTION_TASK = "gaze-detection"
 OPEN_VOCABULARY_OBJECT_DETECTION_TASK = "open-vocabulary-object-detection"
+ANOMALY_DETECTION_TASK = "anomaly-detection"
 INTERACTIVE_INSTANCE_SEGMENTATION_TASK = "interactive-instance-segmentation"
 
 
@@ -507,6 +508,22 @@ REGISTERED_MODELS: Dict[
     ("sam2", INTERACTIVE_INSTANCE_SEGMENTATION_TASK, BackendType.TORCH): LazyClass(
         module_name="inference_models.models.sam2.sam2_torch",
         class_name="SAM2Torch",
+    ),
+    ("aie", OBJECT_DETECTION_TASK, BackendType.ULTRALYTICS): LazyClass(
+        module_name="inference_models.models.aie.aie_object_detection",
+        class_name="AIEForObjectDetection",
+    ),
+    ("aie", CLASSIFICATION_TASK, BackendType.ULTRALYTICS): LazyClass(
+        module_name="inference_models.models.aie.aie_classification",
+        class_name="AIEForClassification",
+    ),
+    ("aie", INSTANCE_SEGMENTATION_TASK, BackendType.ULTRALYTICS): LazyClass(
+        module_name="inference_models.models.aie.aie_instance_segmentation",
+        class_name="AIEForInstanceSegmentation",
+    ),
+    ("aie", ANOMALY_DETECTION_TASK, BackendType.TORCH): LazyClass(
+        module_name="inference_models.models.aie.aie_anomaly_detection",
+        class_name="AIEForAnomalyDetection",
     ),
 }
 
