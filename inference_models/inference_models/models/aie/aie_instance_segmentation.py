@@ -6,16 +6,18 @@ import numpy as np
 import torch
 
 from inference_models.configuration import DEFAULT_DEVICE
+from inference_models.entities import ImageDimensions
 from inference_models.models.base.instance_segmentation import (
     InstanceDetections,
     InstanceSegmentationModel,
 )
+from inference_models.models.common.roboflow.model_packages import PreProcessingMetadata
 
 from inference_models.models.aie._aie_ultralytics_base import _AIEUltralyticsBase
 
 
 class AIEForInstanceSegmentation(
-    InstanceSegmentationModel[List[np.ndarray], List[Tuple[int, int]], list],
+    InstanceSegmentationModel[List[np.ndarray], List[PreProcessingMetadata], list],
 ):
     """AIE YOLO instance segmentation model.
 
@@ -57,10 +59,23 @@ class AIEForInstanceSegmentation(
         self,
         images: Union[torch.Tensor, List[torch.Tensor], np.ndarray, List[np.ndarray]],
         **kwargs,
-    ) -> Tuple[List[np.ndarray], List[Tuple[int, int]]]:
+    ) -> Tuple[List[np.ndarray], List[PreProcessingMetadata]]:
         np_images = _AIEUltralyticsBase._images_to_numpy_list(images)
-        original_sizes = [(img.shape[0], img.shape[1]) for img in np_images]
-        return np_images, original_sizes
+        metadata_list = []
+        for img in np_images:
+            h, w = img.shape[0], img.shape[1]
+            original_size = ImageDimensions(height=h, width=w)
+            metadata_list.append(
+                PreProcessingMetadata(
+                    pad_left=0, pad_top=0, pad_right=0, pad_bottom=0,
+                    original_size=original_size,
+                    size_after_pre_processing=original_size,
+                    inference_size=original_size,
+                    scale_width=1.0, scale_height=1.0,
+                    static_crop_offset=None,
+                )
+            )
+        return np_images, metadata_list
 
     def forward(
         self, pre_processed_images: List[np.ndarray], **kwargs
@@ -79,7 +94,7 @@ class AIEForInstanceSegmentation(
     def post_process(
         self,
         model_results: list,
-        pre_processing_meta: List[Tuple[int, int]],
+        pre_processing_meta: List[PreProcessingMetadata],
         **kwargs,
     ) -> List[InstanceDetections]:
         detections_list = []

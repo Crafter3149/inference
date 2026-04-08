@@ -58,6 +58,10 @@ class AIEAnomalyDetectionBlockManifest(WorkflowBlockManifest):
     images: Selector(kind=[IMAGE_KIND]) = ImageInputField
 
     @classmethod
+    def get_parameters_accepting_batches(cls) -> List[str]:
+        return ["images"]
+
+    @classmethod
     def describe_outputs(cls) -> List[OutputDefinition]:
         return [
             OutputDefinition(name="anomaly_map", kind=[IMAGE_KIND]),
@@ -133,13 +137,8 @@ class AIEAnomalyDetectionBlockV1(WorkflowBlock):
             anomaly_map_raw = np.array(prediction.anomaly_map, dtype=np.float32)
             if anomaly_map_raw.ndim == 3:
                 anomaly_map_raw = anomaly_map_raw[0]
-            map_min = anomaly_map_raw.min()
-            map_max = anomaly_map_raw.max()
-            if map_max > map_min:
-                normalized = (anomaly_map_raw - map_min) / (map_max - map_min)
-            else:
-                normalized = np.zeros_like(anomaly_map_raw)
-            grayscale = (normalized * 255).astype(np.uint8)
+            clipped = anomaly_map_raw.clip(0, 1)
+            grayscale = (clipped * 255).astype(np.uint8)
             # IMAGE_KIND expects BGR 3-channel or grayscale numpy array
             # Convert grayscale to 3-channel BGR for compatibility
             anomaly_map_bgr = np.stack([grayscale, grayscale, grayscale], axis=-1)
