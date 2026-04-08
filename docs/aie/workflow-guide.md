@@ -403,23 +403,34 @@ result = response.json()
 
 ## 6. 呼叫 API
 
-### 6.1 執行 Workflow
+Workflow 有兩種呼叫方式：
+
+| 方式 | 端點 | 特點 |
+|------|------|------|
+| **直接執行** | `POST /workflows/run` | 每次帶完整 spec，不儲存 |
+| **註冊後呼叫** | `POST /local/workflows/{id}` | 先儲存到 server，之後用 ID 呼叫 |
+
+### 6.1 直接執行（帶 spec）
+
+每次 request 帶完整的 workflow spec，不需要預先註冊：
 
 ```python
 import json
+import base64
 import requests
+
+SERVER = "http://localhost:9001"
 
 # 讀取 workflow JSON
 with open("workflows/product_level.json") as f:
     workflow_spec = json.load(f)
 
 # 準備影像（base64）
-import base64
 with open("test_image.jpg", "rb") as f:
     base64_data = base64.b64encode(f.read()).decode()
 
 # 執行
-response = requests.post("http://localhost:9001/workflows/run", json={
+response = requests.post(f"{SERVER}/workflows/run", json={
     "specification": workflow_spec,
     "inputs": {
         "image": {"type": "base64", "value": base64_data},
@@ -435,7 +446,117 @@ result = response.json()
 # result["outputs"][0]["anomaly_score"] → 0.82
 ```
 
-### 6.2 直接呼叫模型（不用 Workflow）
+適用場景：開發測試、一次性執行、workflow spec 頻繁變動。
+
+### 6.2 註冊後呼叫（Builder API）
+
+先將 workflow 儲存到 server，之後用 ID 呼叫，不需要每次帶 spec。
+
+> **前提**：啟動 server 時設定 `ENABLE_BUILDER=true`
+
+#### 步驟 1：取得 CSRF token
+
+Builder API 的寫入端點（POST / DELETE）受 CSRF 保護。
+
+**什麼是 CSRF？**
+CSRF（Cross-Site Request Forgery）是一種 Web 攻擊：惡意網頁誘導瀏覽器對你的 server
+發送請求（例如刪除 workflow）。因為瀏覽器會自動帶上 cookie，server 無法分辨是你本人
+還是惡意網頁發的。CSRF token 是 server 產生的一次性密鑰，只有真正能存取 server 的人
+才拿得到——request 必須在 header 帶上這個 token，server 才會放行。
+
+**為什麼只有寫入端點需要？**
+讀取（GET `/workflows/run`、`/local/workflows/{id}`）不改變 server 狀態，沒有風險。
+但 POST / DELETE `/build/api/*` 會新增、覆寫、刪除磁碟上的 workflow 檔案，所以需要保護。
+
+**Token 從哪來？**
+Server 首次啟動時自動產生隨機 token，寫入磁碟檔案：
+`{MODEL_CACHE_DIR}/workflow/local/.csrf`
+
+Token 在 server 生命週期內不變。取得方式（擇一）：
+
+| 方式 | 指令 |
+|------|------|
+| Docker 容器內 | `docker exec <container> cat /tmp/cache/workflow/local/.csrf` |
+| 本地開發 | 直接讀取檔案（路徑取決於 `MODEL_CACHE_DIR`） |
+| Builder UI | 訪問 `http://localhost:9001/build`，token 內嵌在 HTML 中 |
+
+```python
+# 本地開發取得 CSRF token
+from pathlib import Path
+csrf_token = Path("/tmp/cache/workflow/local/.csrf").read_text()
+```
+
+> **注意**：`POST /workflows/run` 和 `POST /local/workflows/{id}` 這兩個**執行**端點
+> 不需要 CSRF token。只有 `/build/api/*` 的管理端點需要。
+
+#### 步驟 2：註冊 Workflow
+
+```python
+import json
+import requests
+
+SERVER = "http://localhost:9001"
+
+# 讀取 workflow spec
+with open("workflows/product_level.json") as f:
+    workflow_spec = json.load(f)
+
+# 註冊（workflow_id 只能包含英數、底線、連字號）
+workflow_id = "product-ad-check"
+response = requests.post(
+    f"{SERVER}/build/api/{workflow_id}",
+    json=workflow_spec,
+    headers={"X-CSRF": csrf_token}
+)
+# {"message": "Workflow 'product-ad-check' created/updated successfully."}
+```
+
+#### 步驟 3：用 ID 呼叫
+
+```python
+import base64
+
+with open("test_image.jpg", "rb") as f:
+    base64_data = base64.b64encode(f.read()).decode()
+
+# 用 workspace "local" + workflow_id 呼叫
+response = requests.post(f"{SERVER}/local/workflows/{workflow_id}", json={
+    "inputs": {
+        "image": {"type": "base64", "value": base64_data},
+        "ad_model_id": "/models/ad_model",
+        "bin_threshold": 120,
+        "contour_count_threshold": 1
+    }
+})
+
+result = response.json()
+```
+
+#### 管理已註冊的 Workflow
+
+```python
+headers = {"X-CSRF": csrf_token}
+
+# 列出所有已註冊的 workflow
+requests.get(f"{SERVER}/build/api", headers=headers).json()
+
+# 取得特定 workflow
+requests.get(f"{SERVER}/build/api/{workflow_id}", headers=headers).json()
+
+# 更新（覆寫）
+requests.post(f"{SERVER}/build/api/{workflow_id}", json=new_spec, headers=headers)
+
+# 刪除
+requests.delete(f"{SERVER}/build/api/{workflow_id}", headers=headers)
+```
+
+#### 儲存位置
+
+Workflow 以 JSON 檔儲存在 `{MODEL_CACHE_DIR}/workflow/local/` 下，
+檔名為 `sha256(workflow_id).json`。Docker 部署時，若 `MODEL_CACHE_DIR` 掛載為 volume，
+已註冊的 workflow 在容器重啟後仍然存在。
+
+### 6.3 直接呼叫模型（不用 Workflow）
 
 ```python
 # 載入模型

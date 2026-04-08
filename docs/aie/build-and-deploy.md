@@ -197,6 +197,8 @@ Parallel 模式有以下限制，尚未為 AIE 模型適配：
 | `NUM_WORKERS` | `1` | uvicorn / gunicorn worker 數量 |
 | `USE_INFERENCE_MODELS` | `True` | 啟用 inference_models 套件 |
 | `ENABLE_STREAM_API` | `True` | 啟用 Stream Management API（一般模式） |
+| `ENABLE_BUILDER` | `False` | 啟用 Builder API（workflow 註冊/管理，見 Workflow 手冊 §6.2） |
+| `MODEL_CACHE_DIR` | `/tmp/cache` | 模型與 workflow 儲存目錄 |
 
 ### 4.2 Parallel 模式專用
 
