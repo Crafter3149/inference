@@ -1,82 +1,62 @@
-// Dashboard-specific TypeScript interfaces and types
-
+// Server
 export interface ServerInfo {
   name: string;
   version: string;
   uuid: string;
 }
 
+export type HealthStatus = "healthy" | "error" | "loading";
+
+// Models
 export interface ModelInfo {
   model_id: string;
   task_type: string;
-  batch_size: number;
+  batch_size: number | null;
+  input_height: number | null;
+  input_width: number | null;
 }
 
 export interface ModelsResponse {
   models: ModelInfo[];
 }
 
-export interface Metrics {
-  residentMemoryBytes?: number;
-  startTimeSeconds?: number;
+// Inference - Object Detection / Instance Segmentation
+export interface ObjectDetectionPrediction {
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+  confidence: number;
+  class: string;
+  class_id: number;
+  detection_id: string;
+  parent_id: string | null;
 }
 
-export interface RequestStats {
-  total: number;
-  successRate: number;
-  topEndpoints: Array<{ 
-    endpoint: string; 
-    count: number; 
-    successRate: number;
-    successCount: number;
-    errorCount: number;
-  }>;
+export interface ObjectDetectionResponse {
+  image: { width: number; height: number };
+  predictions: ObjectDetectionPrediction[];
+  visualization: string | null;
+  time: number;
 }
 
-export type HealthStatus = "healthy" | "error" | "loading";
-
-// Hook return types
-export interface ServerDataState {
-  serverInfo: ServerInfo | null;
-  healthStatus: HealthStatus;
-  loading: boolean;
-  error: string | null;
-  refetch: () => void;
+// Inference - Classification
+export interface ClassificationPrediction {
+  class: string;
+  class_id: number;
+  confidence: number;
 }
 
-export interface ModelsDataState {
-  models: ModelInfo[];
-  loading: boolean;
-  error: string | null;
-  refetch: () => void;
+export interface ClassificationResponse {
+  image: { width: number; height: number };
+  predictions: ClassificationPrediction[];
+  top: string;
+  confidence: number;
+  time: number;
 }
 
-export interface MetricsDataState {
-  metrics: Metrics;
-  requestStats: RequestStats;
-  loading: boolean;
-  error: string | null;
-  refetch: () => void;
-}
-
-export interface LogEntry {
-  timestamp: string;
-  level: string;
-  logger: string;
-  message: string;
-  module: string;
-  line: number;
-}
-
-export interface LogsResponse {
-  logs: LogEntry[];
-  total_count: number;
-}
-
-export interface LogsDataState {
-  logs: LogEntry[];
-  loading: boolean;
-  error: string | null;
-  logsAvailable: boolean;
-  refetch: () => void;
+// Workflow
+export interface WorkflowResponse {
+  outputs: Record<string, unknown>[];
+  profiler_trace: unknown[] | null;
 }

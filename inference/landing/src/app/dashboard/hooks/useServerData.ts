@@ -1,41 +1,27 @@
-import { useState, useEffect, useCallback } from 'react';
-import { ServerInfo, ServerDataState } from '../types';
+import { useState, useEffect, useCallback } from "react";
+import { api } from "../api";
+import type { ServerInfo, HealthStatus } from "../types";
 
-export function useServerData(): ServerDataState {
+export function useServerData() {
   const [serverInfo, setServerInfo] = useState<ServerInfo | null>(null);
-  const [loading, setLoading] = useState(true);
+  const [healthStatus, setHealthStatus] = useState<HealthStatus>("loading");
   const [error, setError] = useState<string | null>(null);
 
-  const fetchData = useCallback(async () => {
+  const refetch = useCallback(async () => {
     try {
+      const [info, health] = await Promise.all([api.getInfo(), api.getHealth()]);
+      setServerInfo(info);
+      setHealthStatus(health);
       setError(null);
-      
-      const response = await fetch('/info');
-      if (response.ok) {
-        const info = await response.json();
-        setServerInfo(info);
-      } else {
-        setError(`Failed to fetch server info (${response.status})`);
-      }
     } catch (err) {
-      setError('Server connection failed');
-      console.error('Failed to fetch server info:', err);
-    } finally {
-      setLoading(false);
+      setError(err instanceof Error ? err.message : "Server connection failed");
+      setHealthStatus("error");
     }
   }, []);
 
   useEffect(() => {
-    fetchData();
-  }, [fetchData]);
+    refetch();
+  }, [refetch]);
 
-  const healthStatus = error ? 'error' : (serverInfo ? 'healthy' : 'loading');
-
-  return {
-    serverInfo,
-    healthStatus,
-    loading,
-    error,
-    refetch: fetchData
-  };
+  return { serverInfo, healthStatus, error, refetch };
 }

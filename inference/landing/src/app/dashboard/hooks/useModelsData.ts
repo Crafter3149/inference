@@ -1,40 +1,45 @@
-import { useState, useEffect, useCallback } from 'react';
-import { ModelInfo, ModelsResponse, ModelsDataState } from '../types';
+import { useState, useEffect, useCallback } from "react";
+import { api } from "../api";
+import type { ModelInfo } from "../types";
 
-export function useModelsData(): ModelsDataState {
+export function useModelsData() {
   const [models, setModels] = useState<ModelInfo[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  const fetchData = useCallback(async () => {
+  const refetch = useCallback(async () => {
     try {
+      const data = await api.getModels();
+      setModels(data.models || []);
       setError(null);
-      
-      const response = await fetch('/model/registry');
-      if (response.ok) {
-        const data: ModelsResponse = await response.json();
-        setModels(data.models || []);
-      } else {
-        setError(`Failed to fetch models (${response.status})`);
-        // Keep previous models on error, don't reset to empty array
-      }
     } catch (err) {
-      setError('Failed to connect to models endpoint');
-      console.error('Failed to fetch models:', err);
-      // Keep previous models on error
+      setError(err instanceof Error ? err.message : "Failed to fetch models");
     } finally {
       setLoading(false);
     }
   }, []);
 
   useEffect(() => {
-    fetchData();
-  }, [fetchData]);
+    refetch();
+  }, [refetch]);
 
-  return {
-    models,
-    loading,
-    error,
-    refetch: fetchData
+  const addModel = async (model_id: string, model_type?: string, api_key?: string) => {
+    const data = await api.addModel(model_id, model_type, api_key);
+    setModels(data.models);
+    return data;
   };
+
+  const removeModel = async (model_id: string) => {
+    const data = await api.removeModel(model_id);
+    setModels(data.models);
+    return data;
+  };
+
+  const clearModels = async () => {
+    const data = await api.clearModels();
+    setModels(data.models);
+    return data;
+  };
+
+  return { models, loading, error, refetch, addModel, removeModel, clearModels };
 }

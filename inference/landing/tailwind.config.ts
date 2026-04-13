@@ -1,31 +1,29 @@
-import type { Config } from 'tailwindcss'
-import colors from 'tailwindcss/colors'
+import type { Config } from "tailwindcss";
 
 const config: Config = {
   content: [
-    './src/pages/**/*.{js,ts,jsx,tsx,mdx}',
-    './src/components/**/*.{js,ts,jsx,tsx,mdx}',
-    './src/app/**/*.{js,ts,jsx,tsx,mdx}',
+    "./src/pages/**/*.{js,ts,jsx,tsx,mdx}",
+    "./src/components/**/*.{js,ts,jsx,tsx,mdx}",
+    "./src/app/**/*.{js,ts,jsx,tsx,mdx}",
   ],
   theme: {
     extend: {
       colors: {
-        primary: colors.violet,
+        surface: {
+          DEFAULT: "#0f1117",
+          card: "#1a1d27",
+          hover: "#232733",
+        },
+        border: {
+          DEFAULT: "#2a2e3a",
+        },
         accent: {
-          purple: '#A351FB',
-          'purple-light': '#8B5CF6',
-          'purple-dark': '#7C3AED',
-        }
-      },
-      backgroundImage: {
-        'gradient-radial': 'radial-gradient(var(--tw-gradient-stops))',
-        'gradient-conic':
-          'conic-gradient(from 180deg at 50% 50%, var(--tw-gradient-stops))',
+          DEFAULT: "#6366f1",
+          hover: "#818cf8",
+        },
       },
     },
   },
-  plugins: [
-    require('@headlessui/tailwindcss')({ prefix: 'ui' })
-  ],
-}
-export default config
+  plugins: [],
+};
+export default config;
