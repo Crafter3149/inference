@@ -6,6 +6,7 @@ import { JsonViewer } from "../components/JsonViewer";
 import { ImageUploader } from "../components/ImageUploader";
 import { BBoxCanvas } from "../components/BBoxCanvas";
 import { ClassificationChart } from "../components/ClassificationChart";
+import { HeatmapCanvas } from "../components/HeatmapCanvas";
 import { useModelsData } from "../hooks/useModelsData";
 import { useAutoRefresh } from "../hooks/useAutoRefresh";
 import { api } from "../api";
@@ -133,10 +134,11 @@ export function InferencePage() {
     if (selectedTaskType === "anomaly-detection") {
       const r = result as AnomalyDetectionResponse;
       return (
-        <div className="text-center space-y-2">
-          <div className="text-4xl font-bold text-white">{r.anomaly_score.toFixed(4)}</div>
-          <div className="text-sm text-gray-400">Anomaly Score</div>
-        </div>
+        <HeatmapCanvas
+          imageSrc={imageDataUrl}
+          anomalyMap={r.anomaly_map}
+          anomalyScore={r.anomaly_score}
+        />
       );
     }
 
