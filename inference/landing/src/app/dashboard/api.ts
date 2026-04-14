@@ -8,13 +8,24 @@ import type {
   WorkflowResponse,
 } from "./types";
 
-async function request<T>(path: string, init?: RequestInit): Promise<T> {
-  const res = await fetch(path, init);
-  if (!res.ok) {
-    const text = await res.text().catch(() => res.statusText);
-    throw new Error(`${res.status}: ${text}`);
+async function request<T>(path: string, init?: RequestInit, timeoutMs = 120_000): Promise<T> {
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), timeoutMs);
+  try {
+    const res = await fetch(path, { ...init, signal: controller.signal });
+    if (!res.ok) {
+      const text = await res.text().catch(() => res.statusText);
+      throw new Error(`${res.status}: ${text}`);
+    }
+    return res.json();
+  } catch (err) {
+    if (err instanceof DOMException && err.name === "AbortError") {
+      throw new Error(`Request to ${path} timed out after ${timeoutMs / 1000}s`);
+    }
+    throw err;
+  } finally {
+    clearTimeout(timer);
   }
-  return res.json();
 }
 
 export const api = {

@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useCallback } from "react";
+import React, { useState, useCallback, useEffect, useRef } from "react";
 import { Card } from "../components/Card";
 import { JsonViewer } from "../components/JsonViewer";
 import { ImageUploader } from "../components/ImageUploader";
@@ -25,8 +25,22 @@ export function InferencePage() {
   const [imageDataUrl, setImageDataUrl] = useState<string | null>(null);
   const [result, setResult] = useState<ObjectDetectionResponse | ClassificationResponse | AnomalyDetectionResponse | null>(null);
   const [loading, setLoading] = useState(false);
+  const [elapsed, setElapsed] = useState(0);
+  const elapsedRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [inferTime, setInferTime] = useState<number | null>(null);
+
+  useEffect(() => {
+    if (loading) {
+      setElapsed(0);
+      const t0 = Date.now();
+      elapsedRef.current = setInterval(() => setElapsed(Date.now() - t0), 200);
+    } else if (elapsedRef.current) {
+      clearInterval(elapsedRef.current);
+      elapsedRef.current = null;
+    }
+    return () => { if (elapsedRef.current) clearInterval(elapsedRef.current); };
+  }, [loading]);
 
   // OD / IS params
   const [confidence, setConfidence] = useState(0.4);
@@ -165,7 +179,12 @@ export function InferencePage() {
                 <label className={labelClass}>Model</label>
                 <select
                   value={selectedModel}
-                  onChange={(e) => setSelectedModel(e.target.value)}
+                  onChange={(e) => {
+                    setSelectedModel(e.target.value);
+                    setResult(null);
+                    setError(null);
+                    setInferTime(null);
+                  }}
                   className={inputClass}
                 >
                   <option value="">Select a model</option>
@@ -245,7 +264,7 @@ export function InferencePage() {
                 disabled={loading || !imageBase64 || !selectedModel}
                 className="w-full px-4 py-2.5 bg-accent hover:bg-accent-hover text-white text-sm font-medium rounded-lg disabled:opacity-50 transition-colors"
               >
-                {loading ? "Running..." : "Run Inference"}
+                {loading ? `Running... ${(elapsed / 1000).toFixed(1)}s` : "Run Inference"}
               </button>
             </div>
           </Card>

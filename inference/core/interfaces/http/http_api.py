@@ -2,6 +2,7 @@ import base64
 import concurrent
 import logging
 import os
+import pathlib
 import re
 from concurrent.futures import CancelledError, Future, ThreadPoolExecutor
 from functools import partial
@@ -389,6 +390,27 @@ class GCPServerlessMiddleware(BaseHTTPMiddleware):
         return response
 
 
+def _resolve_landing_out() -> pathlib.Path:
+    """Return the absolute path to ``inference/landing/out``.
+
+    Checks two locations in order:
+    1. Relative ``./inference/landing/out`` (Docker / dev repo checkout)
+    2. Installed package location (pip install whl)
+    """
+    # 1. Relative path (Docker / dev)
+    rel = pathlib.Path("./inference/landing/out")
+    if rel.is_dir():
+        return rel
+
+    # 2. Package path (site-packages after pip install)
+    pkg = pathlib.Path(__file__).resolve().parents[3] / "landing" / "out"
+    if pkg.is_dir():
+        return pkg
+
+    # Fallback to relative (will fail at mount time with clear error)
+    return rel
+
+
 class HttpInterface(BaseInterface):
     """Roboflow defined HTTP interface for a general-purpose inference server.
 
@@ -442,14 +464,15 @@ class HttpInterface(BaseInterface):
         except Exception:
             pass
 
+        _landing_out = _resolve_landing_out()
         app.mount(
             "/static",
-            StaticFiles(directory="./inference/landing/out/static", html=True),
+            StaticFiles(directory=str(_landing_out / "static"), html=True),
             name="static",
         )
         app.mount(
             "/_next/static",
-            StaticFiles(directory="./inference/landing/out/_next/static", html=True),
+            StaticFiles(directory=str(_landing_out / "_next" / "static"), html=True),
             name="_next_static",
         )
 
@@ -3823,7 +3846,7 @@ class HttpInterface(BaseInterface):
 
         app.mount(
             "/",
-            StaticFiles(directory="./inference/landing/out", html=True),
+            StaticFiles(directory=str(_landing_out), html=True),
             name="root",
         )
 
