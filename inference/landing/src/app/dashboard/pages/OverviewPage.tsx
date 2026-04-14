@@ -66,6 +66,15 @@ export function OverviewPage() {
           >
             API Documentation (Swagger)
           </a>
+          <a
+            href="/build"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="px-4 py-2 bg-surface hover:bg-surface-hover border border-border rounded-lg text-sm text-gray-300 hover:text-white transition-colors"
+          >
+            Workflow Builder
+            <span className="ml-1 text-xs text-gray-500">(requires internet)</span>
+          </a>
         </div>
       </Card>
     </div>

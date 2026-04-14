@@ -11,21 +11,15 @@ import { useAutoRefresh } from "../hooks/useAutoRefresh";
 import { api } from "../api";
 import type { ObjectDetectionResponse, ClassificationResponse } from "../types";
 
-type TaskType = "object-detection" | "classification" | "instance-segmentation";
-
-const TASK_LABELS: Record<TaskType, string> = {
-  "object-detection": "Object Detection",
-  "classification": "Classification",
-  "instance-segmentation": "Instance Segmentation",
-};
+const inputClass =
+  "w-full px-3 py-2 bg-surface border border-border rounded-lg text-sm text-white focus:outline-none focus:border-accent";
+const labelClass = "block text-xs text-gray-500 mb-1";
 
 export function InferencePage() {
   const { models, refetch: refreshModels } = useModelsData();
   useAutoRefresh(refreshModels, { interval: 5000 });
 
   const [selectedModel, setSelectedModel] = useState("");
-  const [taskType, setTaskType] = useState<TaskType>("object-detection");
-  const [confidence, setConfidence] = useState(0.4);
   const [imageBase64, setImageBase64] = useState<string | null>(null);
   const [imageDataUrl, setImageDataUrl] = useState<string | null>(null);
   const [result, setResult] = useState<ObjectDetectionResponse | ClassificationResponse | null>(null);
@@ -33,17 +27,17 @@ export function InferencePage() {
   const [error, setError] = useState<string | null>(null);
   const [inferTime, setInferTime] = useState<number | null>(null);
 
-  const handleModelChange = useCallback(
-    (modelId: string) => {
-      setSelectedModel(modelId);
-      const model = models.find((m) => m.model_id === modelId);
-      if (model) {
-        const t = model.task_type as TaskType;
-        if (t in TASK_LABELS) setTaskType(t);
-      }
-    },
-    [models],
-  );
+  // OD / IS params
+  const [confidence, setConfidence] = useState(0.4);
+  const [iouThreshold, setIouThreshold] = useState(0.3);
+  const [maxDetections, setMaxDetections] = useState(300);
+  const [classFilter, setClassFilter] = useState("");
+  const [visualizePredictions, setVisualizePredictions] = useState(false);
+
+  // IS-only params
+  const [maskDecodeMode, setMaskDecodeMode] = useState("accurate");
+
+  const selectedTaskType = models.find((m) => m.model_id === selectedModel)?.task_type ?? "";
 
   const handleImageSelect = useCallback((base64: string) => {
     setImageBase64(base64);
@@ -60,16 +54,46 @@ export function InferencePage() {
     setResult(null);
     setInferTime(null);
 
+    const SUPPORTED_INFER_TYPES = ["object-detection", "classification", "instance-segmentation"];
+    if (!SUPPORTED_INFER_TYPES.includes(selectedTaskType)) {
+      setError(
+        `Task type "${selectedTaskType}" does not have a dedicated inference endpoint. ` +
+        `Use the Workflow page to run this model.`
+      );
+      setLoading(false);
+      return;
+    }
+
     try {
       const image = { type: "base64", value: imageBase64 };
       let res: ObjectDetectionResponse | ClassificationResponse;
 
-      if (taskType === "classification") {
-        res = await api.inferClassification({ model_id: selectedModel, image, confidence });
-      } else if (taskType === "instance-segmentation") {
-        res = await api.inferInstanceSegmentation({ model_id: selectedModel, image, confidence });
+      const odParams: Record<string, unknown> = {
+        model_id: selectedModel,
+        image,
+        confidence,
+        iou_threshold: iouThreshold,
+        max_detections: maxDetections,
+        visualize_predictions: visualizePredictions,
+      };
+      if (classFilter.trim()) {
+        odParams.class_filter = classFilter.split(",").map((s) => s.trim()).filter(Boolean);
+      }
+
+      if (selectedTaskType === "classification") {
+        res = await api.inferClassification({
+          model_id: selectedModel,
+          image,
+          confidence,
+          visualize_predictions: visualizePredictions,
+        });
+      } else if (selectedTaskType === "instance-segmentation") {
+        res = await api.inferInstanceSegmentation({
+          ...odParams,
+          mask_decode_mode: maskDecodeMode,
+        });
       } else {
-        res = await api.inferObjectDetection({ model_id: selectedModel, image, confidence });
+        res = await api.inferObjectDetection(odParams);
       }
 
       setInferTime(res.time ? res.time * 1000 : 0);
@@ -84,7 +108,7 @@ export function InferencePage() {
   const renderResult = () => {
     if (!result || !imageDataUrl) return null;
 
-    if (taskType === "object-detection" || taskType === "instance-segmentation") {
+    if (selectedTaskType === "object-detection" || selectedTaskType === "instance-segmentation") {
       const r = result as ObjectDetectionResponse;
       return (
         <BBoxCanvas
@@ -96,13 +120,17 @@ export function InferencePage() {
       );
     }
 
-    if (taskType === "classification") {
+    if (selectedTaskType === "classification") {
       const r = result as ClassificationResponse;
       return <ClassificationChart predictions={r.predictions} top={r.top} confidence={r.confidence} />;
     }
 
     return null;
   };
+
+  const isOdOrIs = selectedTaskType === "object-detection" || selectedTaskType === "instance-segmentation";
+  const isCls = selectedTaskType === "classification";
+  const isIs = selectedTaskType === "instance-segmentation";
 
   return (
     <div>
@@ -117,11 +145,11 @@ export function InferencePage() {
           <Card title="Settings">
             <div className="space-y-4">
               <div>
-                <label className="block text-xs text-gray-500 mb-1">Model</label>
+                <label className={labelClass}>Model</label>
                 <select
                   value={selectedModel}
-                  onChange={(e) => handleModelChange(e.target.value)}
-                  className="w-full px-3 py-2 bg-surface border border-border rounded-lg text-sm text-white focus:outline-none focus:border-accent"
+                  onChange={(e) => setSelectedModel(e.target.value)}
+                  className={inputClass}
                 >
                   <option value="">Select a model</option>
                   {models.map((m) => (
@@ -131,27 +159,70 @@ export function InferencePage() {
                   ))}
                 </select>
               </div>
-              <div>
-                <label className="block text-xs text-gray-500 mb-1">Task Type</label>
-                <select
-                  value={taskType}
-                  onChange={(e) => setTaskType(e.target.value as TaskType)}
-                  className="w-full px-3 py-2 bg-surface border border-border rounded-lg text-sm text-white focus:outline-none focus:border-accent"
-                >
-                  {Object.entries(TASK_LABELS).map(([k, v]) => (
-                    <option key={k} value={k}>{v}</option>
-                  ))}
-                </select>
-              </div>
-              <div>
-                <label className="block text-xs text-gray-500 mb-1">Confidence: {confidence.toFixed(2)}</label>
-                <input
-                  type="range" min="0.01" max="1" step="0.01"
-                  value={confidence}
-                  onChange={(e) => setConfidence(+e.target.value)}
-                  className="w-full accent-accent"
-                />
-              </div>
+              {selectedTaskType && (
+                <div className="flex items-center justify-between text-sm">
+                  <span className="text-gray-500">Task Type</span>
+                  <span className="px-2 py-0.5 bg-accent/10 text-accent-hover rounded text-xs">{selectedTaskType}</span>
+                </div>
+              )}
+
+              {/* OD + IS + CLS: confidence */}
+              {(isOdOrIs || isCls) && (
+                <div>
+                  <label className={labelClass}>Confidence: {confidence.toFixed(2)}</label>
+                  <input type="range" min="0.01" max="1" step="0.01" value={confidence}
+                    onChange={(e) => setConfidence(+e.target.value)} className="w-full accent-accent" />
+                </div>
+              )}
+
+              {/* OD + IS: iou_threshold */}
+              {isOdOrIs && (
+                <div>
+                  <label className={labelClass}>IoU Threshold: {iouThreshold.toFixed(2)}</label>
+                  <input type="range" min="0.01" max="1" step="0.01" value={iouThreshold}
+                    onChange={(e) => setIouThreshold(+e.target.value)} className="w-full accent-accent" />
+                </div>
+              )}
+
+              {/* OD + IS: max_detections */}
+              {isOdOrIs && (
+                <div>
+                  <label className={labelClass}>Max Detections</label>
+                  <input type="number" min="1" max="3000" value={maxDetections}
+                    onChange={(e) => setMaxDetections(+e.target.value)} className={inputClass} />
+                </div>
+              )}
+
+              {/* OD + IS: class_filter */}
+              {isOdOrIs && (
+                <div>
+                  <label className={labelClass}>Class Filter (comma-separated)</label>
+                  <input type="text" value={classFilter} placeholder="e.g. person, car"
+                    onChange={(e) => setClassFilter(e.target.value)} className={inputClass} />
+                </div>
+              )}
+
+              {/* IS-only: mask_decode_mode */}
+              {isIs && (
+                <div>
+                  <label className={labelClass}>Mask Decode Mode</label>
+                  <select value={maskDecodeMode} onChange={(e) => setMaskDecodeMode(e.target.value)} className={inputClass}>
+                    <option value="accurate">Accurate</option>
+                    <option value="fast">Fast</option>
+                    <option value="tradeoff">Tradeoff</option>
+                  </select>
+                </div>
+              )}
+
+              {/* OD + IS + CLS: visualize_predictions */}
+              {(isOdOrIs || isCls) && (
+                <label className="flex items-center gap-2 text-sm text-gray-300 cursor-pointer">
+                  <input type="checkbox" checked={visualizePredictions}
+                    onChange={(e) => setVisualizePredictions(e.target.checked)} className="accent-accent" />
+                  Visualize Predictions (server-side)
+                </label>
+              )}
+
               <button
                 onClick={runInference}
                 disabled={loading || !imageBase64 || !selectedModel}

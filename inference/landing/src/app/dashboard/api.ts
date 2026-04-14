@@ -30,11 +30,7 @@ export const api = {
     request<ModelsResponse>("/model/add", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        model_id,
-        model_type: model_type || undefined,
-        api_key: api_key || undefined,
-      }),
+      body: JSON.stringify({ model_id, model_type, api_key }),
     }),
 
   removeModel: (model_id: string) =>

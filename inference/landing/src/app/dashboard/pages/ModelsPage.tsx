@@ -79,27 +79,24 @@ export function ModelsPage() {
       <Card title="Load Model" className="mb-6">
         <form onSubmit={handleAdd} className="flex flex-wrap gap-3 items-end">
           <div className="flex-1 min-w-[200px]">
-            <label className="block text-xs text-gray-500 mb-1">Model ID *</label>
+            <label className="block text-xs text-gray-500 mb-1">Model Path *</label>
             <input
               type="text"
               value={modelId}
               onChange={(e) => setModelId(e.target.value)}
-              placeholder="project/version"
-              className="w-full px-3 py-2 bg-surface border border-border rounded-lg text-sm text-white placeholder-gray-600 focus:outline-none focus:border-accent"
+              placeholder="/path/to/model"
+              className="w-full px-3 py-2 bg-surface border border-border rounded-lg text-sm text-white placeholder-gray-600 font-mono focus:outline-none focus:border-accent"
             />
           </div>
           <div className="w-40">
             <label className="block text-xs text-gray-500 mb-1">Model Type</label>
-            <select
+            <input
+              type="text"
               value={modelType}
               onChange={(e) => setModelType(e.target.value)}
-              className="w-full px-3 py-2 bg-surface border border-border rounded-lg text-sm text-white focus:outline-none focus:border-accent"
-            >
-              <option value="">Auto-detect</option>
-              <option value="object-detection">Object Detection</option>
-              <option value="classification">Classification</option>
-              <option value="instance-segmentation">Instance Segmentation</option>
-            </select>
+              placeholder="Optional"
+              className="w-full px-3 py-2 bg-surface border border-border rounded-lg text-sm text-white placeholder-gray-600 focus:outline-none focus:border-accent"
+            />
           </div>
           <div className="w-48">
             <label className="block text-xs text-gray-500 mb-1">API Key</label>
@@ -116,7 +113,7 @@ export function ModelsPage() {
             disabled={actionLoading || !modelId.trim()}
             className="px-4 py-2 bg-accent hover:bg-accent-hover text-white text-sm rounded-lg disabled:opacity-50 transition-colors"
           >
-            {actionLoading ? "Loading..." : "Load Model"}
+            {actionLoading ? "Loading..." : "Load"}
           </button>
         </form>
       </Card>

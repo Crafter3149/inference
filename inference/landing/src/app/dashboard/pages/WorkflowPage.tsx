@@ -9,18 +9,20 @@ import { api } from "../api";
 const EXAMPLE_WORKFLOW = JSON.stringify(
   {
     version: "1.0",
-    inputs: [{ type: "InferenceImage", name: "image" }],
+    inputs: [
+      { type: "InferenceImage", name: "image" },
+      { type: "WorkflowParameter", name: "model_id", default_value: "/path/to/model" },
+    ],
     steps: [
       {
-        type: "roboflow_core/roboflow_object_detection_model@v2",
-        name: "detection",
-        image: "$inputs.image",
-        model_id: "YOUR_MODEL_ID",
-        confidence: 0.4,
+        type: "roboflow_core/aie_anomaly_detection_model@v1",
+        name: "ad",
+        images: "$inputs.image",
+        model_id: "$inputs.model_id",
       },
     ],
     outputs: [
-      { type: "JsonField", name: "predictions", selector: "$steps.detection.predictions" },
+      { type: "JsonField", name: "anomaly_score", selector: "$steps.ad.anomaly_score" },
     ],
   },
   null,
