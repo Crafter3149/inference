@@ -1,0 +1,119 @@
+# ============================================================================
+# Dockerfile.aie.torch.gpu
+#
+# AIE inference server — PyTorch runtime + CUDA GPU
+#
+# Build:
+#   docker build -t aie-server:latest -f docker/dockerfiles/Dockerfile.aie.torch.gpu .
+#
+# Run:
+#   docker run --gpus all -p 9001:9001 -v /path/to/models:/models aie-server:latest
+#
+# Override defaults:
+#   docker run --gpus all -p 8080:8080 \
+#     -e PORT=8080 -e MAX_ACTIVE_MODELS=5 \
+#     -v /path/to/models:/models aie-server:latest
+# ============================================================================
+
+# ---------------------------------------------------------------------------
+# Stage 1: builder — install all Python dependencies
+# ---------------------------------------------------------------------------
+FROM nvcr.io/nvidia/cuda:12.4.1-cudnn-devel-ubuntu22.04 AS builder
+
+WORKDIR /app
+
+RUN rm -rf /var/lib/apt/lists/* && apt-get clean && apt-get update -y \
+    && DEBIAN_FRONTEND=noninteractive apt-get install -y \
+        python3-pip \
+        git \
+        libopencv-dev \
+        libgdal-dev \
+        libvips-dev \
+        rustc \
+        cargo \
+    && rm -rf /var/lib/apt/lists/*
+
+RUN python3 -m pip install -U pip uv
+
+# 1) PyTorch (cu124) — cached layer, largest dependency
+RUN pip3 install --no-cache-dir \
+    --index-url https://download.pytorch.org/whl/cu124 \
+    torch torchvision
+
+# 2) inference_models deps (torch-cu124 ONLY — no onnx/trt/mediapipe)
+COPY inference_models/uv.lock inference_models/pyproject.toml /build/inference_models/
+WORKDIR /build/inference_models
+RUN UV_PROJECT_ENVIRONMENT=/usr uv sync --locked --extra torch-cu124
+
+WORKDIR /app
+
+# 3) Core inference requirements
+COPY requirements/_requirements.txt \
+     requirements/requirements.http.txt \
+     requirements/requirements.cli.txt \
+     requirements/requirements.sdk.http.txt \
+     ./
+
+RUN pip3 install --no-cache-dir \
+    -r _requirements.txt \
+    -r requirements.http.txt \
+    -r requirements.cli.txt \
+    -r requirements.sdk.http.txt \
+    "setuptools<=75.5.0"
+
+
+# ---------------------------------------------------------------------------
+# Stage 2: runtime — minimal image with only what's needed to run
+# ---------------------------------------------------------------------------
+FROM nvcr.io/nvidia/cuda:12.4.1-cudnn-runtime-ubuntu22.04 AS runtime
+
+WORKDIR /app
+
+# Copy Python + all installed packages from builder
+COPY --from=builder /usr/local/lib/python3.10 /usr/local/lib/python3.10
+COPY --from=builder /usr/local/bin /usr/local/bin
+
+# Runtime system libraries
+RUN rm -rf /var/lib/apt/lists/* && apt-get clean && apt-get update -y \
+    && DEBIAN_FRONTEND=noninteractive apt-get install -y \
+        libxext6 \
+        libopencv-dev \
+        python3-pip \
+        libgdal-dev \
+        libvips-dev \
+    && rm -rf /var/lib/apt/lists/*
+
+RUN ln -sf /usr/bin/python3 /usr/bin/python
+
+# Copy application source
+COPY inference                              inference
+COPY inference_models/inference_models      inference_models
+COPY inference_sdk                          inference_sdk
+COPY inference_cli                          inference_cli
+COPY docker/config/aie_http.py              aie_http.py
+
+ENV PYTHONPATH=/app
+
+# --- AIE-specific defaults ---------------------------------------------------
+ENV NUM_WORKERS=1
+ENV HOST=0.0.0.0
+ENV PORT=9001
+ENV MAX_ACTIVE_MODELS=3
+ENV MAX_BATCH_SIZE=1
+
+# Disable features not needed for AIE
+ENV ENABLE_STREAM_API=False
+ENV ACTIVE_LEARNING_ENABLED=False
+
+# Enable features needed for AIE
+ENV ALLOW_INFERENCE_MODELS_DIRECTLY_ACCESS_LOCAL_PACKAGES=True
+ENV WORKFLOWS_STEP_EXECUTION_MODE=local
+ENV WORKFLOWS_MAX_CONCURRENT_STEPS=4
+ENV ENABLE_BUILDER=true
+ENV ENABLE_DASHBOARD=true
+ENV ALLOW_CUSTOM_PYTHON_EXECUTION_IN_WORKFLOWS=True
+ENV API_LOGGING_ENABLED=True
+
+EXPOSE ${PORT}
+
+ENTRYPOINT uvicorn aie_http:app --workers $NUM_WORKERS --host $HOST --port $PORT
