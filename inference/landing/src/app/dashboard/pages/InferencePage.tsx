@@ -9,7 +9,7 @@ import { ClassificationChart } from "../components/ClassificationChart";
 import { useModelsData } from "../hooks/useModelsData";
 import { useAutoRefresh } from "../hooks/useAutoRefresh";
 import { api } from "../api";
-import type { ObjectDetectionResponse, ClassificationResponse } from "../types";
+import type { ObjectDetectionResponse, ClassificationResponse, AnomalyDetectionResponse } from "../types";
 
 const inputClass =
   "w-full px-3 py-2 bg-surface border border-border rounded-lg text-sm text-white focus:outline-none focus:border-accent";
@@ -22,7 +22,7 @@ export function InferencePage() {
   const [selectedModel, setSelectedModel] = useState("");
   const [imageBase64, setImageBase64] = useState<string | null>(null);
   const [imageDataUrl, setImageDataUrl] = useState<string | null>(null);
-  const [result, setResult] = useState<ObjectDetectionResponse | ClassificationResponse | null>(null);
+  const [result, setResult] = useState<ObjectDetectionResponse | ClassificationResponse | AnomalyDetectionResponse | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [inferTime, setInferTime] = useState<number | null>(null);
@@ -54,7 +54,7 @@ export function InferencePage() {
     setResult(null);
     setInferTime(null);
 
-    const SUPPORTED_INFER_TYPES = ["object-detection", "classification", "instance-segmentation"];
+    const SUPPORTED_INFER_TYPES = ["object-detection", "classification", "instance-segmentation", "anomaly-detection"];
     if (!SUPPORTED_INFER_TYPES.includes(selectedTaskType)) {
       setError(
         `Task type "${selectedTaskType}" does not have a dedicated inference endpoint. ` +
@@ -66,7 +66,7 @@ export function InferencePage() {
 
     try {
       const image = { type: "base64", value: imageBase64 };
-      let res: ObjectDetectionResponse | ClassificationResponse;
+      let res: ObjectDetectionResponse | ClassificationResponse | AnomalyDetectionResponse;
 
       const odParams: Record<string, unknown> = {
         model_id: selectedModel,
@@ -80,7 +80,12 @@ export function InferencePage() {
         odParams.class_filter = classFilter.split(",").map((s) => s.trim()).filter(Boolean);
       }
 
-      if (selectedTaskType === "classification") {
+      if (selectedTaskType === "anomaly-detection") {
+        res = await api.inferAnomalyDetection({
+          model_id: selectedModel,
+          image,
+        });
+      } else if (selectedTaskType === "classification") {
         res = await api.inferClassification({
           model_id: selectedModel,
           image,
@@ -123,6 +128,16 @@ export function InferencePage() {
     if (selectedTaskType === "classification") {
       const r = result as ClassificationResponse;
       return <ClassificationChart predictions={r.predictions} top={r.top} confidence={r.confidence} />;
+    }
+
+    if (selectedTaskType === "anomaly-detection") {
+      const r = result as AnomalyDetectionResponse;
+      return (
+        <div className="text-center space-y-2">
+          <div className="text-4xl font-bold text-white">{r.anomaly_score.toFixed(4)}</div>
+          <div className="text-sm text-gray-400">Anomaly Score</div>
+        </div>
+      );
     }
 
     return null;

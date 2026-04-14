@@ -4,6 +4,7 @@ import type {
   ModelsResponse,
   ObjectDetectionResponse,
   ClassificationResponse,
+  AnomalyDetectionResponse,
   WorkflowResponse,
 } from "./types";
 
@@ -59,6 +60,13 @@ export const api = {
 
   inferInstanceSegmentation: (body: Record<string, unknown>) =>
     request<ObjectDetectionResponse>("/infer/instance_segmentation", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(body),
+    }),
+
+  inferAnomalyDetection: (body: Record<string, unknown>) =>
+    request<AnomalyDetectionResponse>("/infer/anomaly_detection", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(body),

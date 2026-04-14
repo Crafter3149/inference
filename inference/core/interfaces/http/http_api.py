@@ -52,6 +52,7 @@ from inference.core.entities.requests.gaze import GazeDetectionInferenceRequest
 from inference.core.entities.requests.groundingdino import GroundingDINOInferenceRequest
 from inference.core.entities.requests.inference import (
     ClassificationInferenceRequest,
+    CVInferenceRequest,
     DepthEstimationRequest,
     InferenceRequest,
     InferenceRequestImage,
@@ -97,6 +98,7 @@ from inference.core.entities.responses.clip import (
 )
 from inference.core.entities.responses.gaze import GazeDetectionInferenceResponse
 from inference.core.entities.responses.inference import (
+    AnomalyDetectionInferenceResponse,
     ClassificationInferenceResponse,
     DepthEstimationResponse,
     InferenceResponse,
@@ -1346,6 +1348,43 @@ class HttpInterface(BaseInterface):
                 return process_inference_request(
                     inference_request,
                     active_learning_eligible=True,
+                    background_tasks=background_tasks,
+                    countinference=countinference,
+                    service_secret=service_secret,
+                )
+
+            @app.post(
+                "/infer/anomaly_detection",
+                response_model=Union[
+                    AnomalyDetectionInferenceResponse,
+                    List[AnomalyDetectionInferenceResponse],
+                    StubResponse,
+                ],
+                summary="Anomaly detection infer",
+                description="Run inference with the specified anomaly detection model",
+                response_model_exclude_none=True,
+            )
+            @with_route_exceptions
+            @usage_collector("request")
+            def infer_anomaly_detection(
+                inference_request: CVInferenceRequest,
+                background_tasks: BackgroundTasks,
+                countinference: Optional[bool] = None,
+                service_secret: Optional[str] = None,
+            ):
+                """Run inference with the specified anomaly detection model.
+
+                Args:
+                    inference_request (CVInferenceRequest): The request containing model ID and image(s).
+                    background_tasks: (BackgroundTasks) pool of fastapi background tasks
+
+                Returns:
+                    Union[AnomalyDetectionInferenceResponse, List[AnomalyDetectionInferenceResponse]]: The response containing anomaly score and heatmap.
+                """
+                logger.debug(f"Reached /infer/anomaly_detection")
+                return process_inference_request(
+                    inference_request,
+                    active_learning_eligible=False,
                     background_tasks=background_tasks,
                     countinference=countinference,
                     service_secret=service_secret,

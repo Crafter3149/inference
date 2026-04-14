@@ -55,6 +55,14 @@ export interface ClassificationResponse {
   time: number;
 }
 
+// Inference - Anomaly Detection
+export interface AnomalyDetectionResponse {
+  image: { width: number; height: number };
+  anomaly_score: number;
+  anomaly_map: number[][];
+  time: number;
+}
+
 // Workflow
 export interface WorkflowResponse {
   outputs: Record<string, unknown>[];
