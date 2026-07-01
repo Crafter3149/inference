@@ -153,6 +153,14 @@ pip install inference_aie-1.2.0-py3-none-any.whl
 pip install business_plugin-0.1.0-py3-none-any.whl
 ```
 
+> **依賴注意事項**
+> - `inference_aie` whl 已把 `inference_models` 的模型依賴 + **CPU `onnxruntime`** 設為必需，
+>   `pip install` 會自動拉齊，不需手動補裝（torch 仍須先裝 CUDA 版，見步驟 1）。
+> - 刻意用 **CPU `onnxruntime`** 而非 `onnxruntime-gpu`：AIE 是 torch 後端，onnx 只需能 import、
+>   不做計算；`onnxruntime-gpu` 會因找不到系統 cuDNN/CUDA DLL 而
+>   `DLL load failed while importing onnxruntime_pybind11_state`。若另有 onnx 模型要走 GPU，
+>   再自行安裝對應 cuDNN 的 `onnxruntime-gpu`。
+
 #### install.bat 範例
 
 ```bat
@@ -365,6 +373,7 @@ requests.post(f"{BASE}/model/remove", json={"model_id": "/srv/models/locate_mode
 | `ENABLE_BUILDER` | `true` | 啟用 Workflow Builder UI |
 | `ENABLE_DASHBOARD` | `true` | 啟用 Dashboard |
 | `WORKFLOWS_PLUGINS` | `""` | 業務邏輯 plugin（逗號分隔） |
+| `LOCAL_MODELS_DIR` | `""` | 模型根目錄；其子資料夾(含 `model_config.json`)經 `GET /models/local` 列給 client 選取。未設則該端點回 `configured:false` |
 
 > `inference aie start` 和 `Dockerfile.aie.torch.gpu` 已內建這些預設值，不需手動設定。
 
