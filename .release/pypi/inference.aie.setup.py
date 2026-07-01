@@ -98,9 +98,9 @@ for pkg in im_packages:
 # own dependency metadata. We must therefore declare its runtime deps here, else a
 # fresh install is missing transformers/timm/onnxruntime/etc. and the server fails
 # importing ROBOFLOW_MODEL_TYPES at startup. This list mirrors
-# inference_models/pyproject.toml [project].dependencies (heavy model deps) plus the
-# onnx-cu12 GPU backend. torch/torchvision are intentionally omitted — install.bat
-# installs them from the CUDA index first, satisfying the transitive requirement.
+# inference_models/pyproject.toml [project].dependencies (heavy model deps) plus a
+# CPU onnxruntime. torch/torchvision are intentionally omitted — install.bat installs
+# them from the CUDA index first, satisfying the transitive requirement.
 INFERENCE_MODELS_RUNTIME = [
     "transformers>=5.2.0,<5.3.0",
     "timm>=1.0.0,<2.0.0",
@@ -118,9 +118,12 @@ INFERENCE_MODELS_RUNTIME = [
     "bitsandbytes>=0.46.1,<0.48.0; sys_platform != 'darwin'",
     "pyvips>=2.2.3,<3.0.0",
     "num2words~=0.5.14",
-    # onnx GPU runtime backend (inference_models onnx-cu12 extra) — imported at startup
-    # by the onnx entries in ROBOFLOW_MODEL_TYPES; absent from every base requirements file.
-    "onnxruntime-gpu>=1.17.0,<1.23.0; sys_platform != 'darwin'",
+    # CPU onnxruntime — only needed so the onnx entries in ROBOFLOW_MODEL_TYPES import
+    # at startup; AIE models are torch-backend, so onnx is never used for compute. The
+    # GPU build (onnxruntime-gpu) is intentionally avoided: it needs system cuDNN/CUDA
+    # DLLs that torch's bundled libs do not satisfy, causing onnxruntime DLL-load
+    # failures ("DLL load failed while importing onnxruntime_pybind11_state").
+    "onnxruntime>=1.15.1,<1.23.0",
 ]
 
 setuptools.setup(
