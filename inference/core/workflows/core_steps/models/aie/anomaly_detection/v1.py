@@ -15,7 +15,7 @@ from inference.core.workflows.execution_engine.entities.base import (
 from inference.core.workflows.execution_engine.entities.types import (
     FLOAT_KIND,
     IMAGE_KIND,
-    STRING_KIND,
+    ROBOFLOW_MODEL_ID_KIND,
     ImageInputField,
     Selector,
     WorkflowParameterSelector,
@@ -51,9 +51,11 @@ class AIEAnomalyDetectionBlockManifest(WorkflowBlockManifest):
         protected_namespaces=(),
     )
     type: Literal["roboflow_core/aie_anomaly_detection_model@v1"]
-    model_id: Union[str, WorkflowParameterSelector(kind=[STRING_KIND])] = Field(
-        description="Local path to AIE anomaly detection model directory",
-        examples=["D:/models/ad_model", "$inputs.model_id"],
+    model_id: Union[str, WorkflowParameterSelector(kind=[ROBOFLOW_MODEL_ID_KIND])] = (
+        Field(
+            description="Local path to AIE anomaly detection model directory",
+            examples=["D:/models/ad_model", "$inputs.model_id"],
+        )
     )
     images: Selector(kind=[IMAGE_KIND]) = ImageInputField
 
@@ -114,9 +116,7 @@ class AIEAnomalyDetectionBlockV1(WorkflowBlock):
         images: Batch[WorkflowImageData],
         model_id: str,
     ) -> BlockResult:
-        inference_images = [
-            i.to_inference_format(numpy_preferred=True) for i in images
-        ]
+        inference_images = [i.to_inference_format(numpy_preferred=True) for i in images]
         request = CVInferenceRequest(
             api_key=self._api_key,
             model_id=model_id,
