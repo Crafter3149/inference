@@ -130,6 +130,7 @@ from inference.core.entities.responses.sam3 import (
     Sam3SegmentationResponse,
 )
 from inference.core.entities.responses.server_state import (
+    LocalModelsResponse,
     ModelsDescriptions,
     ServerVersionInfo,
 )
@@ -177,6 +178,7 @@ from inference.core.env import (
     LAMBDA,
     LEGACY_ROUTE_ENABLED,
     LMM_ENABLED,
+    LOCAL_MODELS_DIR,
     MAX_INFERENCE_MODELS_CACHE_SIZE_MB,
     METRICS_ENABLED,
     MOONDREAM2_ENABLED,
@@ -1267,6 +1269,31 @@ class HttpInterface(BaseInterface):
                 return ModelsDescriptions.from_models_descriptions(
                     models_descriptions=models_descriptions
                 )
+
+            @app.get(
+                "/models/local",
+                response_model=LocalModelsResponse,
+                summary="List local model directories",
+                description=(
+                    "List model directories under the server-configured "
+                    "LOCAL_MODELS_DIR (each containing a model_config.json). "
+                    "Lets clients populate a model picker instead of typing "
+                    "server-side paths by hand. Returns configured=false when "
+                    "LOCAL_MODELS_DIR is unset."
+                ),
+            )
+            @with_route_exceptions
+            def list_local_models():
+                """List local model directories under the configured root.
+
+                The root is server-side only (LOCAL_MODELS_DIR) — never supplied
+                by the client — so there is no path-traversal surface.
+
+                Returns:
+                    LocalModelsResponse: configured flag, root, and model entries.
+                """
+                logger.debug(f"Reached /models/local")
+                return LocalModelsResponse.scan(LOCAL_MODELS_DIR)
 
         # these NEW endpoints need authentication protection
         if not LAMBDA and not GCP_SERVERLESS:

@@ -94,6 +94,35 @@ package_dir = {"": root}
 for pkg in im_packages:
     package_dir[pkg] = os.path.join(im_root, pkg.replace(".", os.sep))
 
+# The wheel BUNDLES inference_models source, so pip never sees inference_models'
+# own dependency metadata. We must therefore declare its runtime deps here, else a
+# fresh install is missing transformers/timm/onnxruntime/etc. and the server fails
+# importing ROBOFLOW_MODEL_TYPES at startup. This list mirrors
+# inference_models/pyproject.toml [project].dependencies (heavy model deps) plus the
+# onnx-cu12 GPU backend. torch/torchvision are intentionally omitted — install.bat
+# installs them from the CUDA index first, satisfying the transitive requirement.
+INFERENCE_MODELS_RUNTIME = [
+    "transformers>=5.2.0,<5.3.0",
+    "timm>=1.0.0,<2.0.0",
+    "accelerate>=1.0.0,<2.0.0",
+    "einops>=0.7.0,<1.0.0",
+    "peft>=0.18.1",
+    "segmentation-models-pytorch>=0.5.0,<1.0.0",
+    "easyocr~=1.7.2",
+    "sentencepiece>=0.2.0,<0.3.0",
+    "rf-clip==1.1",
+    "rf-segment-anything==1.0",
+    "rf-sam-2==1.0.3",
+    "rf_groundingdino==0.3.0",
+    "python-doctr[torch]>=1.0.0",
+    "bitsandbytes>=0.46.1,<0.48.0; sys_platform != 'darwin'",
+    "pyvips>=2.2.3,<3.0.0",
+    "num2words~=0.5.14",
+    # onnx GPU runtime backend (inference_models onnx-cu12 extra) — imported at startup
+    # by the onnx entries in ROBOFLOW_MODEL_TYPES; absent from every base requirements file.
+    "onnxruntime-gpu>=1.17.0,<1.23.0; sys_platform != 'darwin'",
+]
+
 setuptools.setup(
     name="inference-aie",
     version=__version__,
@@ -126,29 +155,10 @@ setuptools.setup(
             "requirements/requirements.cli.txt",
             "requirements/requirements.sdk.http.txt",
         ]
-    ),
-    extras_require={
-        "models": [
-            # Heavy inference_models deps (transformers, SAM, etc.)
-            # Only needed if running non-AIE foundation models
-            "transformers>=5.2.0,<5.3.0",
-            "timm>=1.0.0,<2.0.0",
-            "accelerate>=1.0.0,<2.0.0",
-            "einops>=0.7.0,<1.0.0",
-            "peft>=0.18.1",
-            "segmentation-models-pytorch>=0.5.0,<1.0.0",
-            "easyocr~=1.7.2",
-            "sentencepiece>=0.2.0,<0.3.0",
-            "rf-clip==1.1",
-            "rf-segment-anything==1.0",
-            "rf-sam-2==1.0.3",
-            "rf_groundingdino==0.3.0",
-            "python-doctr[torch]>=1.0.0",
-            "bitsandbytes>=0.46.1,<0.48.0; sys_platform != 'darwin'",
-            "pyvips>=2.2.3,<3.0.0",
-            "num2words~=0.5.14",
-        ],
-    },
+    )
+    + INFERENCE_MODELS_RUNTIME,
+    # Kept as a no-op alias for back-compat; these deps are now REQUIRED (see above).
+    extras_require={"models": INFERENCE_MODELS_RUNTIME},
     classifiers=[
         "Programming Language :: Python :: 3",
         "Operating System :: OS Independent",

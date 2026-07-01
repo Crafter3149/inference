@@ -1,3 +1,5 @@
+import json
+from pathlib import Path
 from typing import List, Optional, Union
 
 from pydantic import BaseModel, ConfigDict, Field
@@ -77,3 +79,73 @@ class ModelsDescriptions(BaseModel):
                 for model_description in models_descriptions
             ]
         )
+
+
+class LocalModelEntry(BaseModel):
+    """One model directory discovered on the server's local filesystem."""
+
+    model_config = ConfigDict(protected_namespaces=())
+    name: str = Field(description="Model directory name", examples=["lightset1"])
+    model_id: str = Field(
+        description="Absolute directory path; pass this as model_id when loading.",
+        examples=["E:/models/lightset1"],
+    )
+    task_type: Optional[str] = Field(
+        None, description="task_type read from the directory's model_config.json"
+    )
+    model_architecture: Optional[str] = Field(
+        None,
+        description="model_architecture read from the directory's model_config.json",
+    )
+
+
+class LocalModelsResponse(BaseModel):
+    """Model directories available under the server-configured LOCAL_MODELS_DIR."""
+
+    configured: bool = Field(
+        description="Whether LOCAL_MODELS_DIR is set on the server."
+    )
+    root: Optional[str] = Field(
+        None, description="The configured models root directory (if any)."
+    )
+    models: List[LocalModelEntry] = Field(
+        default_factory=list,
+        description="Model directories (each containing a model_config.json) under root.",
+    )
+
+    @classmethod
+    def scan(cls, root: Optional[str]) -> "LocalModelsResponse":
+        """Enumerate immediate sub-directories of ``root`` that contain a
+        ``model_config.json`` marker file. ``root`` is server-configured (never
+        client-supplied), so there is no path-traversal surface; only the model
+        directory names + their absolute paths + parsed metadata are exposed.
+        """
+        if not root:
+            return cls(configured=False, root=None, models=[])
+        base = Path(root)
+        entries: List[LocalModelEntry] = []
+        if base.is_dir():
+            for child in sorted(base.iterdir(), key=lambda p: p.name.lower()):
+                if not child.is_dir():
+                    continue
+                cfg = child / "model_config.json"
+                if not cfg.is_file():
+                    continue  # whitelist: only dirs carrying the model marker file
+                task_type = None
+                architecture = None
+                try:
+                    data = json.loads(cfg.read_text(encoding="utf-8"))
+                    if isinstance(data, dict):
+                        task_type = data.get("task_type")
+                        architecture = data.get("model_architecture")
+                except (OSError, ValueError):
+                    pass  # malformed config -> still list the dir, metadata stays None
+                entries.append(
+                    LocalModelEntry(
+                        name=child.name,
+                        model_id=str(child),
+                        task_type=task_type,
+                        model_architecture=architecture,
+                    )
+                )
+        return cls(configured=True, root=str(base), models=entries)

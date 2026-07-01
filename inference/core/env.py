@@ -419,6 +419,12 @@ METRICS_URL = os.getenv("METRICS_URL", f"{API_BASE_URL}/inference-stats")
 MODEL_CACHE_DIR = os.getenv("MODEL_CACHE_DIR", "/tmp/cache")
 INFERENCE_DEBUG_OUTPUT_DIR = os.environ.get("INFERENCE_DEBUG_OUTPUT_DIR")
 
+# Server-configured root directory whose immediate sub-folders are local models
+# (each containing a model_config.json). Exposed read-only via GET /models/local
+# so clients can populate model pickers. Empty (default) disables that endpoint's
+# listing. NOTE: clients never supply this path — it is server-side only.
+LOCAL_MODELS_DIR = os.getenv("LOCAL_MODELS_DIR", "")
+
 # Model ID, default is None
 MODEL_ID = os.getenv("MODEL_ID")
 
