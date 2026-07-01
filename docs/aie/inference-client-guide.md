@@ -38,7 +38,10 @@ return {
 > `outputs`: `{ "verdict":["string"], "die_score":["float"], "details":["*"], "overlay_ls1":["image"], ... }`
 > `inputs`: `{ "image_ls1":["image"], "model_id_ls1":["roboflow_model_id"], "binarize_threshold":["*"], ... }`
 
-型別一覽（出現在 inputs/outputs）：`image`、`string`、`integer`、`float`、`boolean`、`object_detection_prediction`（及其他預測類）、`list`、`dictionary`、`*`（Any，自訂區塊的自由格式輸出）。各型別的 JSON 形狀見 §3（輸入）與 §4（輸出）。
+型別一覽（涵蓋 inputs 與 outputs 的**全集**）：`image`、`roboflow_model_id`、`string`、`integer`、`float`、`boolean`、`object_detection_prediction`（及其他預測類）、`list`、`dictionary`、`*`（Any，自訂區塊的自由格式輸出）。
+哪些當輸入、哪些當輸出由 workflow 決定,因此後面兩節各取子集:**§3.1 只列「會出現在輸入」的型別**(含 `roboflow_model_id`)、**§4 列輸出型別**(如 `object_detection_prediction` 等預測類通常只當模型輸出,不會要 app 填)。各型別的 JSON 形狀見 §3（輸入）與 §4（輸出）。
+
+> **為什麼型別是陣列**：每個輸入/輸出的型別是一個**陣列**，代表它**相容的型別集合**。多數欄位只接受一種 → 1 個元素（如 `["image"]`、`["roboflow_model_id"]`）；少數欄位接受聯集 → 多個元素（如 `["string","secret"]`、`["object_detection_prediction","instance_segmentation_prediction"]`）。填值時給符合**其中任一種**的值即可。TASC 的每個輸入都只有一種。
 
 ### 2.3 `GET /models/local` — 列出伺服器上可用的模型
 ```
@@ -88,7 +91,7 @@ return { "blocks": [
 透過API ：`POST /workflows/describe_interface`（§2.2）獲得每個輸入的名稱與型別。
 
 ### 3.1 依型別提供值
-`describe_interface` 的 `inputs` 是「名稱 → 型別」。各型別與要送出的值：
+`describe_interface` 的 `inputs` 是「名稱 → 型別」。下表是**會出現在輸入**的型別與對應要送的值（§2.2 全集的輸入子集；預測類如 `object_detection_prediction` 通常只當輸出，見 §4）：
 
 | 型別 | 送出的值 |
 |---|---|
@@ -100,6 +103,8 @@ return { "blocks": [
 | `boolean` | 布林（`true` / `false`） |
 | `list` / `dictionary` | JSON 陣列／物件 |
 | `*`（Any） | 任意 JSON 值，依該參數實際用途 |
+
+> 型別其實是**陣列**（相容型別集合，見 §2.2）。只有一個就照上表填；若有**多個**（聯集），給符合其中任一種的值即可——§5 範例以 `kinds[0]`（陣列第一個）為預設處理。
 
 **影像物件 `type` 的完整選項**：
 
@@ -141,7 +146,7 @@ return { "outputs": [ { "<輸出名>": <值>, ... }, ... ] }
 ```json
 { "type": "base64", "value": "<base64 影像>", "video_metadata": { ... 或 null } }
 ```
-`value` 解碼後是 **JPEG** 影像位元組（server 一律以 JPEG／quality 95 編碼，與來源影像格式無關）；要存檔請用 `.jpg`。`video_metadata` 為附帶資訊（可能為 `null` 或一個 metadata 物件），顯示影像時可忽略。解碼只需 `value`：
+`value` 解碼後是影像位元組。**伺服器產生的影像**（overlay/heatmap/裁切等，由 numpy 重新編碼）一律是 **JPEG／quality 95**（寫死於 server，無設定可改）；TASC 的影像輸出全屬此類，存檔用 `.jpg`。（例外：若 workflow 原樣回傳未經處理的輸入影像，會保留你送進去的原始格式。）`video_metadata` 為附帶資訊（可能為 `null` 或 metadata 物件），顯示影像時可忽略。解碼只需 `value`：
 ```csharp
 byte[] bytes = Convert.FromBase64String(value["value"]!.GetValue<string>());
 ```
